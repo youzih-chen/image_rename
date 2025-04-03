@@ -28,6 +28,14 @@ if sys.stderr is not None:
 else:
     sys.stderr = io.TextIOWrapper(open(os.devnull, 'wb'), encoding='utf-8')
 
+# 處理封裝後的資源路徑
+def resource_path(relative_path):
+    """獲取資源的絕對路徑，適配 PyInstaller 封裝"""
+    if hasattr(sys, '_MEIPASS'):
+        # PyInstaller 運行時的臨時路徑
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
 # 全域變數
 folder_path = ""
 field_titles = []
@@ -49,6 +57,16 @@ preview_start = 0
 root = tk.Tk()
 root.title("Image Filename Renamer 1.0")
 root.geometry("1200x800")
+
+# 設定自訂圖標
+icon_path = resource_path("img_ren.ico")
+print(f"Attempting to load icon from: {icon_path}")
+try:
+    icon = Image.open(icon_path)  # 使用 PIL 載入圖標
+    icon_photo = ImageTk.PhotoImage(icon)
+    root.iconphoto(True, icon_photo)  # 設定視窗圖標
+except Exception as e:
+    print(f"Failed to load icon: {e}")
 
 def generate_thumbnails(progress_queue):
     global thumbnail_cache
@@ -77,11 +95,14 @@ def update_progress(progress_bar, progress_queue, total_images, progress_window)
 def load_folder():
     global folder_path, images, rename_map, field_titles, separator, current_index, preview_start
     folder_path = filedialog.askdirectory()
+    print(f"Selected folder: {folder_path}")
     if folder_path:
         images = [f for f in os.listdir(folder_path) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))]
+        print(f"Found {len(images)} image files in folder: {folder_path}")
         if not images:
             messagebox.showerror("Error", "No image files found in the folder")
             image_count_label.config(text="Image 0 of 0")
+            print("No images loaded")
         else:
             current_index = 0
             preview_start = 0
@@ -102,6 +123,7 @@ def load_folder():
             thread.start()
             
             root.after(100, update_progress, progress_bar, progress_queue, len(images), progress_window)
+            print(f"Started thumbnail generation for {len(images)} images")  # 添加日誌：確認啟動縮圖生成
             
             config_path = os.path.join(folder_path, "rename_config.json")
             if os.path.exists(config_path):
@@ -114,6 +136,9 @@ def load_folder():
                         create_field_entries()
                         separator_entry.insert(0, separator)
                         fields_entry.insert(0, ",".join(field_titles))
+                print(f"Loaded config from {config_path}: {len(rename_map)} entries")  # 添加日誌：確認配置載入
+            else:
+                print(f"No config file found at {config_path}")  # 添加日誌：無配置檔案時記錄
 
 def set_fields():
     global field_titles, separator
@@ -209,8 +234,35 @@ def sync_preview_page():
 def save_fields():
     values = [entry.get() for entry in field_entries]
     if all(values):
+        old_values = rename_map.get(images[current_index], None)
         rename_map[images[current_index]] = values
+        print(f"Updated {images[current_index]}: {old_values} -> {values}")  # 日誌：確認更新
         save_config()
+
+def update_preview(index):
+    global current_index, photo
+    save_fields()  # 保存當前圖片
+    current_index = index
+    print(f"Switched to image: {images[current_index]} at index {current_index}")
+    
+    # 從原始檔案載入圖片
+    img_path = os.path.join(folder_path, images[current_index])
+    image = Image.open(img_path)  # 直接載入原始圖片
+    photo = ImageTk.PhotoImage(image)  # 轉換為 tkinter 可用的格式
+    preview_canvas.itemconfig(preview_label, image=photo)  # 更新 Canvas
+    preview_canvas.config(scrollregion=preview_canvas.bbox("all"))  # 調整滾動範圍
+    
+    # 載入先前欄位值
+    for entry in field_entries:
+        entry.delete(0, tk.END)
+    if images[current_index] in rename_map:
+        values = rename_map[images[current_index]]
+        for i, value in enumerate(values):
+            if i < len(field_entries):
+                field_entries[i].insert(0, value)
+        print(f"Loaded previous values: {values}")
+    else:
+        print(f"No previous values for {images[current_index]}")
 
 def save_config():
     if folder_path:
@@ -225,22 +277,24 @@ def generate_bat():
     if not rename_map:
         messagebox.showerror("Error", "Please set field values first")
         return
-    bat_content = [f'cd /d "{folder_path}"']
+    bat_content = [
+        '@chcp 65001',  # 切換 CMD 到 UTF-8
+        f'cd /d "{folder_path}"'
+    ]
     new_names = defaultdict(int)
     for img, values in rename_map.items():
         _, ext = os.path.splitext(img)
         base_name = separator.join(values)
-        # 檢查重複並生成最終檔名
         count = new_names[base_name]
         if count == 0:
             new_name = base_name + ext
         else:
             new_name = f"{base_name}({count}){ext}"
-        new_names[base_name] += 1  # 更新計數
+        new_names[base_name] += 1
         bat_content.append(f'ren "{img}" "{new_name}"')
     bat_content.append("pause")
     bat_path = os.path.join(folder_path, "rename.bat")
-    with open(bat_path, 'w', encoding='ansi') as f:
+    with open(bat_path, 'w', encoding='utf-8') as f:  # 純 UTF-8
         f.write('\n'.join(bat_content))
     messagebox.showinfo("Success", f"Rename commands saved to {bat_path}")
 
