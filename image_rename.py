@@ -104,9 +104,12 @@ def load_folder():
             image_count_label.config(text="Image 0 of 0")
             print("No images loaded")
         else:
+            # 清空 rename_map，確保不保留舊資料
+            rename_map.clear()
             current_index = 0
             preview_start = 0
             
+            # 生成縮圖
             progress_window = tk.Toplevel(root)
             progress_window.title("Loading Images")
             progress_window.geometry("300x100")
@@ -123,22 +126,28 @@ def load_folder():
             thread.start()
             
             root.after(100, update_progress, progress_bar, progress_queue, len(images), progress_window)
-            print(f"Started thumbnail generation for {len(images)} images")  # 添加日誌：確認啟動縮圖生成
+            print(f"Started thumbnail generation for {len(images)} images")
             
+            # 載入配置檔案
             config_path = os.path.join(folder_path, "rename_config.json")
             if os.path.exists(config_path):
                 with open(config_path, 'r', encoding='utf-8') as f:
                     config = json.load(f)
-                    rename_map = config.get("rename_map", {})
+                    loaded_map = config.get("rename_map", {})
+                    # 只保留編輯過的圖片（非全空白）
+                    rename_map.update({
+                        img: values for img, values in loaded_map.items()
+                        if any(values)  # 過濾掉全空白的值
+                    })
                     field_titles[:] = config.get("field_titles", [])
                     separator = config.get("separator", "")
                     if field_titles:
                         create_field_entries()
                         separator_entry.insert(0, separator)
                         fields_entry.insert(0, ",".join(field_titles))
-                print(f"Loaded config from {config_path}: {len(rename_map)} entries")  # 添加日誌：確認配置載入
+                print(f"Loaded config from {config_path}: {len(rename_map)} edited entries")
             else:
-                print(f"No config file found at {config_path}")  # 添加日誌：無配置檔案時記錄
+                print(f"No config file found at {config_path}")
 
 def set_fields():
     global field_titles, separator
@@ -233,11 +242,20 @@ def sync_preview_page():
 
 def save_fields():
     values = [entry.get() for entry in field_entries]
-    if all(values):
-        old_values = rename_map.get(images[current_index], None)
+    old_values = rename_map.get(images[current_index], None)
+    
+    # 若全空白且未曾編輯過，不儲存
+    if not any(values) and old_values is None:
+        print(f"Skipping {images[current_index]}: all fields empty and not previously edited")
+        return
+    
+    # 若有變更或首次編輯，更新
+    if old_values != values:
         rename_map[images[current_index]] = values
-        print(f"Updated {images[current_index]}: {old_values} -> {values}")  # 日誌：確認更新
+        print(f"Updated {images[current_index]}: {old_values} -> {values}")
         save_config()
+    else:
+        print(f"No changes for {images[current_index]}: {values}")
 
 def update_preview(index):
     global current_index, photo
@@ -284,7 +302,12 @@ def generate_bat():
     new_names = defaultdict(int)
     for img, values in rename_map.items():
         _, ext = os.path.splitext(img)
-        base_name = separator.join(values)
+        # 過濾非空白值並連接
+        filtered_values = [v for v in values if v]  # 移除空白值
+        if filtered_values:  # 若有非空白值
+            base_name = separator.join(filtered_values)
+        else:  # 若全空白，使用原名稱
+            base_name = os.path.splitext(img)[0]
         count = new_names[base_name]
         if count == 0:
             new_name = base_name + ext
