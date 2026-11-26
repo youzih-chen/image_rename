@@ -1,4 +1,4 @@
-# Image Filename Renamer 2.0
+# Image Filename Renamer 2.0.0
 
 ## 簡介
 
@@ -6,20 +6,25 @@
 
 由 Python 3.10+ 與 Pillow 開發。
 
-* **Version:** 2.0
-* **Author:** YouZih Chen
+* **Version:** 2.0.0
 
 ---
 
-## 安裝與環境需求
+## 下載與安裝
 
-### 必要套件
+### 直接下載執行檔（Windows）
+
+若不想安裝 Python 環境，可直接前往 GitHub [Releases 頁面](https://github.com/youzih-chen/image_rename/releases) 下載最新版本的 `Image Renamer.exe`（v2.0.0），雙擊即可執行。
+
+### 從原始碼執行
+
+#### 必要套件
 
 ```bash
 pip install pillow
 ```
 
-### 選配套件（建議安裝以獲得完整格式與介面支援）
+#### 選配套件（建議安裝以獲得完整格式與介面支援）
 
 ```bash
 pip install sv-ttk pillow-heif rawpy
@@ -29,11 +34,25 @@ pip install sv-ttk pillow-heif rawpy
 * `pillow-heif`：支援預覽 `.heic`、`.heif`、`.avif` 格式。
 * `rawpy`：支援預覽相機 RAW 檔（若未安裝，程式會嘗試讀取內嵌 JPEG 縮圖或顯示佔位圖示）。
 
-### 啟動程式
+#### 啟動程式
 
 ```bash
 python image_rename.py
 ```
+
+### macOS 使用方式與限制
+
+本程式可透過 Python 原始碼在 macOS 上執行，但有幾點平台差異需注意：
+
+* **執行方式：** Release 頁面提供的 `Image Renamer.exe` 僅限 Windows 使用；macOS 請安裝 Python 3.10+ 與相依套件後，從終端機執行：
+  ```bash
+  pip3 install pillow sv-ttk pillow-heif rawpy
+  python3 image_rename.py
+  ```
+  （若系統 Python 未內建 Tkinter，請透過 Homebrew 安裝對應版本：`brew install python-tk`。）
+* **重新命名方式：** 請直接使用介面上的 **`⚡ Rename Now`**（支援 `↺ Undo Rename` 與 `⟲ Restore Original`）。**`🖹 Export .bat`** 產生的 `rename.bat` 為 Windows 批次檔格式，macOS 無法直接執行。
+* **快捷鍵：** 程式快捷鍵皆綁定 `Ctrl`（例如 `Ctrl + →`、`Ctrl + Enter`、`Ctrl + Z`），在 macOS 上仍請按 **`control`** 鍵而非 `command` 鍵。
+* **檔案定位：** 縮圖右鍵選單在 macOS 會以 `Show in Finder` 開啟檔案所在位置。
 
 ---
 
@@ -157,9 +176,9 @@ python image_rename.py
 
 ---
 
-## 更新紀錄（v1.0 → v2.0）
+## 更新紀錄（v1.0.0 → v2.0.0）
 
-相較於僅能匯出 `.bat` 的 v1.0，v2.0 進行了大幅重構與功能升級：
+相較於僅能匯出 `.bat` 的 v1.0.0，v2.0.0 進行了大幅重構與功能升級：
 
 * **直接重新命名與安全復原機制：**
   * 新增 `⚡ Rename Now` 直接在程式內完成批次更名，並透過兩階段暫存檔名機制避免檔案覆蓋或名稱互換失敗。

@@ -1647,6 +1647,8 @@ class ImageRenamerApp:
             label.grid(row=row, column=col, padx=3, pady=3)
             label.bind("<Button-1>", lambda _e, idx=i: self.show_image(idx, save_current=True))
             label.bind("<Button-3>", lambda e, idx=i: self._show_thumb_context_menu(e, idx))
+            if sys.platform == "darwin":
+                label.bind("<Button-2>", lambda e, idx=i: self._show_thumb_context_menu(e, idx))
             self.all_preview_labels.append(label)
 
         self.update_preview_highlight()
@@ -1714,12 +1716,22 @@ class ImageRenamerApp:
         )
         menu.add_separator()
         if self.folder_path and img_name:
-            menu.add_command(
-                label="📂  Show in Explorer",
-                command=lambda n=img_name: subprocess.run(
+            if sys.platform == "darwin":
+                reveal_label = "📂  Show in Finder"
+                reveal_cmd = lambda n=img_name: subprocess.run(
+                    ["open", "-R", str(self.folder_path / n)], check=False,
+                )
+            elif sys.platform.startswith("win"):
+                reveal_label = "📂  Show in Explorer"
+                reveal_cmd = lambda n=img_name: subprocess.run(
                     ["explorer", "/select,", str(self.folder_path / n)], check=False,
-                ),
-            )
+                )
+            else:
+                reveal_label = "📂  Open Containing Folder"
+                reveal_cmd = lambda: subprocess.run(
+                    ["xdg-open", str(self.folder_path)], check=False,
+                )
+            menu.add_command(label=reveal_label, command=reveal_cmd)
         try:
             menu.tk_popup(event.x_root, event.y_root)
         finally:
